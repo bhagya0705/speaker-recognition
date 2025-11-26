@@ -2,16 +2,13 @@
 # Model: ECAPA big for Speaker verification
 # ############################################################################
 
-# Feature parameters
 n_mels: 80
 
-# Pretrain folder (HuggingFace)
-pretrained_path: speechbrain/spkrec-ecapa-voxceleb
+# Pretrained path changed to local folder
+pretrained_path: app/models
 
-# Output parameters
 out_n_neurons: 7205
 
-# Model params
 compute_features: !new:speechbrain.lobes.features.Fbank
     n_mels: !ref <n_mels>
 
@@ -41,10 +38,9 @@ modules:
     embedding_model: !ref <embedding_model>
     mean_var_norm_emb: !ref <mean_var_norm_emb>
     classifier: !ref <classifier>
-        
+
 label_encoder: !new:speechbrain.dataio.encoder.CategoricalEncoder
 
-        
 pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
     loadables:
         embedding_model: !ref <embedding_model>
@@ -52,7 +48,7 @@ pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
         classifier: !ref <classifier>
         label_encoder: !ref <label_encoder>
     paths:
-        embedding_model: !ref <pretrained_path>/embedding_model.ckpt
-        mean_var_norm_emb: !ref <pretrained_path>/mean_var_norm_emb.ckpt
-        classifier: !ref <pretrained_path>/classifier.ckpt
-        label_encoder: !ref <pretrained_path>/label_encoder.txt
+        embedding_model: app/models/embedding_model.ckpt
+        mean_var_norm_emb: app/models/mean_var_norm_emb.ckpt
+        classifier: app/models/classifier.ckpt
+        label_encoder: app/models/label_encoder.txt

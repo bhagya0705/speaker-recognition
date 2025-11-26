@@ -17,7 +17,7 @@ from .vad import apply_vad
 DEVICE = "cpu"
 
 # LOCAL ECAPA MODEL DIRECTORY
-MODEL_DIR = "app/models/ecapa"   # <-- MUST exist in your repo
+MODEL_DIR = "app/models"   # <-- MUST exist in your repo
 
 if not os.path.exists(MODEL_DIR):
     raise RuntimeError(f"❌ ECAPA model folder missing: {MODEL_DIR}")
@@ -84,5 +84,6 @@ def get_ecapa_embedding_from_file(path: str):
 
     # 8. NORMALIZE
     emb = emb / (np.linalg.norm(emb) + 1e-9)
+
 
     return emb

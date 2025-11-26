@@ -1,7 +1,4 @@
 # app/main.py
-import torchaudio
-torchaudio.set_audio_backend("soundfile")
-
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 import os
 import shutil
@@ -17,116 +14,76 @@ TEMP_DIR = "app/data/temp_audio"
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 
-# ------------------ TEST CONNECTION ------------------
+@app.get("/")
+def home():
+    return {"message": "Backend running offline!"}
+
+
 @app.get("/test_connection")
 def test_connection():
     return {"status": "ok"}
 
 
-# ------------------ LIST SPEAKERS ------------------
 @app.get("/list_speakers")
 def list_speakers():
     users = load_all_embeddings()
     return {"speakers": list(users.keys())}
 
-#---------------------DELETE----------------------
+
 @app.delete("/delete_speaker/{name}")
 def delete_speaker(name: str):
-    speaker_dir = os.path.join("app", "data", "familiar_embeddings", name)
-
-    print("🔍 Trying to delete:", speaker_dir)
-
-    if not os.path.exists(speaker_dir):
-        raise HTTPException(status_code=404, detail="Speaker not found")
-
-    import shutil
-    shutil.rmtree(speaker_dir)
-
-    return {"status": "deleted", "speaker": name}
+    p = os.path.join("app/data/familiar_embeddings", name)
+    if not os.path.exists(p):
+        raise HTTPException(404, "Speaker not found")
+    shutil.rmtree(p)
+    return {"status": "deleted", "name": name}
 
 
-# ------------------ CLEAR TEMP AUDIO ------------------
 @app.post("/clear_temp_audio")
 def clear_temp_audio():
-    try:
-        shutil.rmtree(TEMP_DIR)
-        os.makedirs(TEMP_DIR, exist_ok=True)
-        return {"status": "success", "message": "Temporary audio files cleared"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to clear temporary audio files: {e}")
+    shutil.rmtree(TEMP_DIR, ignore_errors=True)
+    os.makedirs(TEMP_DIR, exist_ok=True)
+    return {"status": "cleared"}
 
 
-# ------------------ ENROLL ------------------
 @app.post("/enroll")
-async def enroll(
-    name: str = Form(...),              # <-- FIX for Android + multipart
-    file: UploadFile = File(...)
-):
-    temp_path = os.path.join(TEMP_DIR, file.filename)
+async def enroll(name: str = Form(...), file: UploadFile = File(...)):
+    temp = os.path.join(TEMP_DIR, file.filename)
 
-    # Save temp audio file
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    with open(temp, "wb") as f:
+        shutil.copyfileobj(file.file, f)
 
-    # Extract ECAPA embedding
-    emb = get_ecapa_embedding_from_file(temp_path)
-
-    # Store embedding
+    emb = get_ecapa_embedding_from_file(temp)
     save_embedding(name, emb)
 
-    return {
-        "status": "enrolled",
-        "name": name,
-        "embedding_dim": len(emb)
-    }
+    return {"status": "enrolled", "name": name}
 
 
-# ------------------ VERIFY (FAMILIARITY CHECK) ------------------
 @app.post("/verify")
 async def verify(file: UploadFile = File(...)):
+    temp = os.path.join(TEMP_DIR, file.filename)
 
-    temp_path = os.path.join(TEMP_DIR, file.filename)
+    with open(temp, "wb") as f:
+        shutil.copyfileobj(file.file, f)
 
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    # Extract embedding
-    query_emb = get_ecapa_embedding_from_file(temp_path)
-
-    # Load all stored embeddings
+    query = get_ecapa_embedding_from_file(temp)
     users = load_all_embeddings()
 
-    best_match = None
-    best_score = 0.0
+    best = None
+    best_score = 0
 
-    for user, stored_emb in users.items():
-        score = match_embedding(query_emb, stored_emb)
+    for user, stored in users.items():
+        score = match_embedding(query, stored)
         if score > best_score:
+            best = user
             best_score = score
-            best_match = user
 
-    # Thresholding
     if best_score >= THRESHOLD:
-        return {
-            "result": "familiar",
-            "name": best_match,
-            "similarity": float(best_score)
-        }
+        return {"result": "familiar", "name": best, "similarity": float(best_score)}
 
-    return {
-        "result": "stranger",
-        "similarity": float(best_score)
-    }
+    return {"result": "stranger", "similarity": float(best_score)}
 
 
-# ------------------ ANDROID USES /recognize ------------------
 @app.post("/recognize")
 async def recognize(file: UploadFile = File(...)):
     return await verify(file)
-
-
-# ------------------ ROOT ROUTE ------------------
-@app.get("/")
-def home():
-
-    return {"message": "Speaker Recognition Backend Running"}
